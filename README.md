@@ -1,3 +1,4 @@
+[gemini-code-1790978960699.html](https://github.com/user-attachments/files/32982844/gemini-code-1790978960699.html)
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -221,18 +222,6 @@
             color: #ccc;
             pointer-events: none;
         }
-
-        /* Claim Overlay */
-        .claim-screen {
-            position: absolute;
-            inset: 0;
-            background: rgba(15, 15, 26, 0.95);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 30;
-        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-purple-500 selection:text-white">
@@ -434,7 +423,7 @@
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
                                 <span class="text-4xl">👑</span>
-                                <span id="gq-play-badge" class="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full text-xs font-bold font-fredoka">Plays: 0/1</span>
+                                <span id="gq-play-badge" class="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1 rounded-full text-xs font-bold font-fredoka">1 Play / Hr</span>
                             </div>
                             <h3 class="font-fredoka text-2xl font-bold text-white">Gold Quest</h3>
                             <p class="text-slate-400 text-sm">Answer questions correctly across 10 rounds to open treasure chests! Earn multiplier boosts and extra gold.</p>
@@ -449,7 +438,7 @@
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
                                 <span class="text-4xl">💻</span>
-                                <span id="ch-play-badge" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3 py-1 rounded-full text-xs font-bold font-fredoka">Plays: 0/1</span>
+                                <span id="ch-play-badge" class="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3 py-1 rounded-full text-xs font-bold font-fredoka">1 Play / Hr</span>
                             </div>
                             <h3 class="font-fredoka text-2xl font-bold text-white">Crypto Hack</h3>
                             <p class="text-slate-400 text-sm">Solve questions across 10 rounds to unlock crypto mining passwords! Hack target blooks to steal their balances.</p>
@@ -539,16 +528,6 @@
                     <div id="shared-question-text" class="font-fredoka text-2xl font-bold text-white mb-4">5 + 7 = ?</div>
                     <div class="options-grid" id="shared-options-grid"></div>
                 </div>
-            </div>
-
-            <!-- SHARED CLAIM / GAME OVER OVERLAY -->
-            <div id="claim-screen" class="claim-screen hidden">
-                <h2 class="font-fredoka text-3xl font-bold text-amber-400 mb-2">Great Job!</h2>
-                <p class="text-slate-300 text-base mb-1">Total Tokens Earned:</p>
-                <p id="claim-tokens-val" class="font-fredoka text-4xl font-extrabold text-emerald-400 mb-4">+0 🪙</p>
-                <button onclick="returnToGameHub()" class="px-8 py-3 rounded-2xl font-fredoka font-bold text-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-b-4 border-emerald-700 active:translate-y-0.5 transition-all">
-                    Collect Tokens & Exit
-                </button>
             </div>
 
         </section>
@@ -775,9 +754,9 @@
             inventory: {},
             lastSpinTimestamp: null,
             soundEnabled: true,
-            playCounts: {
-                'gold-quest': 0,
-                'crypto-hack': 0
+            lastPlayTimestamps: {
+                'gold-quest': null,
+                'crypto-hack': null
             }
         };
 
@@ -840,8 +819,8 @@
                 try { 
                     const parsed = JSON.parse(saved);
                     gameState = { ...gameState, ...parsed };
-                    if (!gameState.playCounts) {
-                        gameState.playCounts = { 'gold-quest': 0, 'crypto-hack': 0 };
+                    if (!gameState.lastPlayTimestamps) {
+                        gameState.lastPlayTimestamps = { 'gold-quest': null, 'crypto-hack': null };
                     }
                 } catch (e) {}
             }
@@ -871,33 +850,48 @@
         }
 
         function updateArcadeHubUI() {
-            const playCounts = gameState.playCounts || {};
-            const gqCount = playCounts['gold-quest'] || 0;
-            const chCount = playCounts['crypto-hack'] || 0;
+            const lastPlay = gameState.lastPlayTimestamps || {};
+            const now = Date.now();
+            const ONE_HOUR = 60 * 60 * 1000;
 
             const gqBadge = document.getElementById("gq-play-badge");
             const chBadge = document.getElementById("ch-play-badge");
             const gqBtn = document.getElementById("gq-play-btn");
             const chBtn = document.getElementById("ch-play-btn");
 
-            if (gqBadge) gqBadge.innerText = `Plays: ${gqCount}/1`;
-            if (chBadge) chBadge.innerText = `Plays: ${chCount}/1`;
-
-            if (gqBtn) {
-                if (gqCount >= 1) {
+            // Gold Quest Cooldown logic
+            const gqLast = lastPlay['gold-quest'];
+            if (gqLast && (now - gqLast < ONE_HOUR)) {
+                const remMs = ONE_HOUR - (now - gqLast);
+                const mins = Math.floor(remMs / (1000 * 60));
+                const secs = Math.floor((remMs % (1000 * 60)) / 1000);
+                if (gqBadge) gqBadge.innerText = `⏳ Ready in ${mins}m ${secs}s`;
+                if (gqBtn) {
                     gqBtn.classList.add("opacity-50", "cursor-not-allowed");
-                    gqBtn.innerText = "PLAY LIMIT REACHED (1/1) 🔒";
-                } else {
+                    gqBtn.innerText = `HOURLY LIMIT REACHED (${mins}m ${secs}s) 🔒`;
+                }
+            } else {
+                if (gqBadge) gqBadge.innerText = `1 Play / Hr`;
+                if (gqBtn) {
                     gqBtn.classList.remove("opacity-50", "cursor-not-allowed");
                     gqBtn.innerText = "PLAY GOLD QUEST 🪙";
                 }
             }
 
-            if (chBtn) {
-                if (chCount >= 1) {
+            // Crypto Hack Cooldown logic
+            const chLast = lastPlay['crypto-hack'];
+            if (chLast && (now - chLast < ONE_HOUR)) {
+                const remMs = ONE_HOUR - (now - chLast);
+                const mins = Math.floor(remMs / (1000 * 60));
+                const secs = Math.floor((remMs % (1000 * 60)) / 1000);
+                if (chBadge) chBadge.innerText = `⏳ Ready in ${mins}m ${secs}s`;
+                if (chBtn) {
                     chBtn.classList.add("opacity-50", "cursor-not-allowed");
-                    chBtn.innerText = "PLAY LIMIT REACHED (1/1) 🔒";
-                } else {
+                    chBtn.innerText = `HOURLY LIMIT REACHED (${mins}m ${secs}s) 🔒`;
+                }
+            } else {
+                if (chBadge) chBadge.innerText = `1 Play / Hr`;
+                if (chBtn) {
                     chBtn.classList.remove("opacity-50", "cursor-not-allowed");
                     chBtn.innerText = "PLAY CRYPTO HACK ⚡";
                 }
@@ -1257,15 +1251,20 @@
         let currentEarnedTokens = 0;
 
         function launchGame(gameId) {
-            // ENFORCE 1-PLAY LIMIT FOR ALL GAMES EXCEPT DON'T LOOK DOWN
+            // ENFORCE 1 PLAY PER HOUR FOR GOLD QUEST AND CRYPTO HACK
             if (gameId !== 'dl-down') {
-                gameState.playCounts = gameState.playCounts || {};
-                const currentPlays = gameState.playCounts[gameId] || 0;
-                if (currentPlays >= 1) {
-                    showToast("⚠ You have reached the maximum limit of 1 play for this game!", "error");
+                gameState.lastPlayTimestamps = gameState.lastPlayTimestamps || {};
+                const lastPlay = gameState.lastPlayTimestamps[gameId];
+                const now = Date.now();
+                const ONE_HOUR = 60 * 60 * 1000;
+
+                if (lastPlay && (now - lastPlay < ONE_HOUR)) {
+                    const remMs = ONE_HOUR - (now - lastPlay);
+                    const mins = Math.floor(remMs / (1000 * 60));
+                    showToast(`⚠ Hourly play limit reached! Try again in ${mins} minute(s).`, "error");
                     return;
                 }
-                gameState.playCounts[gameId] = currentPlays + 1;
+                gameState.lastPlayTimestamps[gameId] = now;
                 saveState();
             }
 
@@ -1291,7 +1290,6 @@
         function returnToGameHub() {
             document.getElementById("active-game-wrapper").classList.add("hidden");
             document.getElementById("quiz-modal").classList.add("hidden");
-            document.getElementById("claim-screen").classList.add("hidden");
             document.getElementById("minigame-hub").classList.remove("hidden");
             currentGameMode = null;
             updateGlobalHeader();
@@ -1303,9 +1301,8 @@
             gameState.tokens += tokensEarned;
             saveState();
 
-            document.getElementById("claim-tokens-val").innerText = `+${tokensEarned.toLocaleString()} 🪙`;
-            document.getElementById("claim-screen").classList.remove("hidden");
-            confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+            showToast(`🎉 Earned +${tokensEarned.toLocaleString()} 🪙 Tokens!`, 'success');
+            returnToGameHub();
         }
 
         // SHARED TRIVIA GENERATOR
@@ -1586,6 +1583,16 @@
             }
             requestAnimationFrame(mainLoop);
         }
+
+        // REAL-TIME COOLDOWN TIMER TICKER
+        setInterval(() => {
+            if (activeTab === 'minigame') {
+                updateArcadeHubUI();
+            }
+            if (activeTab === 'wheel') {
+                checkWheelCooldown();
+            }
+        }, 1000);
 
         // INITIALIZATION
         window.addEventListener("DOMContentLoaded", () => {
